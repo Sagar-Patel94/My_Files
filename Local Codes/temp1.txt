@@ -1,0 +1,63 @@
+const trim = async (req, res) => {
+  let data = {
+    filename: req.body.filePath,
+    sourcePath: path.join(__dirname,`../../${req.body.filePath}`),
+    startTime: req.body.startTime,
+    endTime: req.body.endTime,
+    userId: req.body.userId,
+  };
+  await videoService.trim(data);
+  let result = {
+    message: "Data successfully uploaded",
+    status: 200,
+    data: null
+  }
+  return res.status(200).json(result);
+};
+
+
+
+
+
+const multer = require("multer");
+
+let fname = `${Date.now()}.mp4`, uploadPath;
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // fname = file.originalname;
+    cb(null, fname);
+  },
+});
+
+const uploadFile = multer({
+  storage: storage,
+  fileFilter(req, file, cb) {
+    req.body.video = false;
+    req.body.image = false;
+
+    if (file.originalname.match(/\.(mp4)$/)) {
+      uploadPath = `public/videos/UploadedVideos/`;
+      req.body.video = true;
+      req.body.filePath = `public/videos/UploadedVideos/`+ fname;
+      cb(null, req.body);
+    } else if (
+      file.originalname.match(/\.(jpg)$/) ||
+      file.originalname.match(/\.(png)$/)
+    ) {
+      req.body.image = true;
+      uploadPath = "public/images/UploadedImages/";
+      req.body.filePath = uploadPath;
+      cb(null, req.body);
+    } else {
+      req.body.others = true;
+      uploadPath = "";
+      cb(null, req.body);
+    }
+  },
+});
+let fileUpload = uploadFile.array("file");
+
+module.exports = { fileUpload };

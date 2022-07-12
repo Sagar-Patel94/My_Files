@@ -1,0 +1,317 @@
+const ffmpeg = require("fluent-ffmpeg");
+const pathToFfmpeg = require("ffmpeg-static");
+const ffprobe = require("ffprobe-static");
+const Path = require("path");
+const fs = require("fs");
+const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+const videoModel = require("../models/video");
+const userModel = require("../models/users");
+
+ffmpeg.setFfmpegPath(
+  Path.join(__dirname, "../../packages/ffmpeg/bin/ffmpeg.exe")
+);
+ffmpeg.setFfprobePath(
+  Path.join(__dirname, "../../packages/ffmpeg/bin/ffprobe.exe")
+);
+
+let response, status, data, sourcePath, outputPath;
+var videoNames = [];
+
+const getVideoByUser = async (userId) => {
+  // get all videos from database where userId
+  return await new Promise((resolve, reject) => {});
+};
+
+const addVideo = async (data) => {
+  return await new Promise((resolve, reject) => {
+    req.body.filename = `${mergedVideoFilepath}`;
+    req.body.url = `${filename}`;
+    req.body.editType = "merge";
+    const video = new videoModel(req.body);
+    video.save();
+  });
+};
+
+const trim = async (data) => {
+  let filename = data.filename;
+  let sourcePath = data.url;
+  let startTime = data.startTime;
+  let duration = data.duration;
+  let outputPath = `public/videos/TrimVideos/${filename}`;
+
+  return await new Promise((resolve, reject) => {
+    ffmpeg(sourcePath)
+      .setFfmpegPath(pathToFfmpeg)
+      .setFfprobePath(ffprobe.path)
+      .setStartTime(parseInt(startTime))
+      .duration(parseInt(duration))
+      .on("progress", function (progress) {
+        console.log("Progress :- ", +Math.floor(progress.percent));
+      })
+      .on("end", function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          console.log("conversion Done");
+          let videoObj = {
+            userId: data.userId,
+            filename: `${mergedVideoFilepath}`,
+            url: `${filename}`,
+            editType: "merge",
+          };
+          data = {
+            outputPath: `public/videos/TrimVideos/${filename}`,
+            filename: filename,
+          };
+          resolve(data);
+        }
+      })
+      .on("error", function (err) {
+        console.log("Error :: ", err);
+        reject(err);
+      })
+      .saveToFile(outputPath);
+  });
+};
+
+const merge = async (req, res) => {
+  return await new Promise(async (resolve, reject) => {
+    const rootFolder = Path.join(
+      __dirname,
+      "../../public/videos/UploadedVideos/"
+    );
+    let filename, mergedVideoFilepath;
+    await readdir(rootFolder);
+
+    setTimeout(async function () {
+      let filepath = Path.join(__dirname, "../../public/videos/mergedVideos");
+      let tempFilename = `${Date.now()}-merged.mp4`;
+      filename = Path.join(filepath, tempFilename);
+      mergedVideoFilepath = Path.join("mergedVideos", tempFilename);
+      var mergedVideo = ffmpeg();
+      videoNames.forEach(function (videoName) {
+        mergedVideo = mergedVideo.addInput(videoName);
+      });
+
+      mergedVideo
+        .setFfmpegPath(ffmpegInstaller.path)
+        .on("progress", function (progress) {
+          console.log("Merging :- " + Math.floor(progress.percent));
+        })
+        .on("error", function (err) {
+          console.log("An error occurred: " + err.message);
+          reject(err);
+        })
+        .on("end", function () {
+          console.log("Merging finished !");
+          const directory = "public/videos/UploadedVideos";
+          fs.readdir(directory, (err, files) => {
+            if (err) reject(err);
+
+            for (const file of files) {
+              fs.unlink(Path.join(directory, file), (err) => {
+                if (err) throw err;
+              });
+            }
+
+            // req.body.userId = "62bbe1bfc18be1e01c68bce4";
+            // req.body.filename = `${mergedVideoFilepath}`;
+            // req.body.url = `${filename}`;
+            // req.body.editType = "merge";
+            // const video = new videoModel(req.body);
+            // video.save();
+    //         req.body.name = "SAGAR";
+    // const user = new userModel(req.body);
+    // user.save();
+            resolve();
+          });
+        })
+        .mergeToFile(`${filename}`);
+
+        
+    }, 500);
+  });
+};
+
+const annotation = async (req, res) => {
+  return await new Promise(async (resolve, reject) => {});
+};
+
+// const trim = async (req, res) => {
+//   try {
+//     filename = req.body.filename;
+//     sourcePath = req.body.url;
+//     startTime = req.body.startTime;
+//     endTime = req.body.endTime;
+//     duration = endTime - startTime;
+//     outputPath = `public/videos/TrimVideos/${filename}`;
+
+//     await new Promise((resolve, reject) => {
+//       ffmpeg(sourcePath)
+//         .setFfmpegPath(pathToFfmpeg)
+//         .setFfprobePath(ffprobe.path)
+//         .output(outputPath)
+//         .setStartTime(startTime)
+//         .setDuration(duration)
+//         .withVideoCodec("copy")
+//         .withAudioCodec("copy")
+//         .on("progress", function (progress) {
+//           console.log("Progress :- ", +Math.floor(progress.percent));
+//         })
+//         .on("end", function (err) {
+//           if (!err) {
+//             console.log("conversion Done");
+//             resolve();
+//           }
+//         })
+//         .on("error", function (err) {
+//           console.log("error: ", err);
+//           reject(err);
+//         })
+//         .run();
+//     });
+
+//     data = {
+//       outputPath: `public/videos/TrimVideos/${filename}`,
+//       filename: filename,
+//     };
+
+//     message = "video Trim successfully";
+//     status = 200;
+//   } catch (error) {
+//     data = {};
+//     message = error.message;
+//     status = 500;
+//   }
+//   response = {
+//     data: data,
+//     message: message,
+//   };
+//   return response;
+// };
+
+// const merge = async (req, res) => {
+//   const rootFolder = Path.join(
+//     __dirname,
+//     "../../public/videos/UploadedVideos/"
+//   );
+//   let filename, mergedVideoFilepath;
+//   await readdir(rootFolder);
+//   setTimeout(function () {
+//     let filepath = Path.join(__dirname, "../../public/videos/mergedVideos");
+//     let tempFilename = `${Date.now()}-merged.mp4`;
+//     filename = Path.join(filepath, tempFilename);
+//     mergedVideoFilepath = Path.join("mergedVideos", tempFilename);
+//     var mergedVideo = ffmpeg();
+//     videoNames.forEach(function (videoName) {
+//       mergedVideo = mergedVideo.addInput(videoName);
+//     });
+
+//     mergedVideo
+//       .setFfmpegPath(ffmpegInstaller.path)
+//       .on("progress", function (progress) {
+//         console.log("Merging :- " + Math.floor(progress.percent));
+//       })
+//       .on("error", function (err) {
+//         console.log("An error occurred: " + err.message);
+//         return err;
+//       })
+//       .on("end", function () {
+//         console.log("Merging finished !");
+
+//         const directory = "public/videos/UploadedVideos";
+
+//         fs.readdir(directory, (err, files) => {
+//           if (err) throw err;
+
+//           for (const file of files) {
+//             fs.unlink(Path.join(directory, file), (err) => {
+//               if (err) throw err;
+//             });
+//           }
+//         });
+//       })
+//       .mergeToFile(`${filename}`);
+
+//     // req.body.name = "SM";
+//     // const user = new userModel(req.body);
+//     // user.save();
+
+//     req.body.userId = "62bbe1bfc18be1e01c68bce4";
+//     req.body.filename = `${mergedVideoFilepath}`;
+//     req.body.url = `${filename}`;
+//     const video = new videoModel(req.body);
+//     video.save();
+//   }, 500);
+// };
+
+async function readdir(filePath) {
+  const rootFolder = Path.join(
+    __dirname,
+    "../../public/videos/UploadedVideos/"
+  );
+  fs.readdir(filePath, (err, files) => {
+    files.forEach((file) => {
+      let filePath = Path.join(rootFolder, file);
+      videoNames.push(`${filePath}`);
+    });
+    return videoNames;
+  });
+}
+
+module.exports = { trim, merge };
+
+
+
+
+const trim = async (data) => {
+  console.log(data, "=======================")
+  let filename = data.filename;
+  let sourcePath = data.sourcePath;
+  console.log(sourcePath, "-------------------")
+  let startTime = data.startTime;
+  let endTime = data.endTime;
+  let duration = endTime - startTime;
+  let outputPath = `public/videos/TrimVideos/${filename}`;
+
+  return await new Promise((resolve, reject) => {
+    ffmpeg(sourcePath)
+      .setFfmpegPath(pathToFfmpeg)
+      .setFfprobePath(ffprobe.path)
+      .output(outputPath)
+      .setStartTime(startTime)
+      .setDuration(duration)
+      .withVideoCodec("copy")
+      .withAudioCodec("copy")
+      .on("progress", function (progress) {
+        console.log("Progress :- ", +Math.floor(progress.percent));
+      })
+      .on("end", function (err) {
+        if (!err) {
+          console.log("conversion Done");
+          resolve();
+        }
+      })
+      .on("error", function (err) {
+        console.log("error: ", err);
+        reject(err);
+      })
+      .run();
+  });
+};
+
+
+const trim = async (req, res) => {
+  // let startTime = req.body.startTime;
+  // let endTime = req.body.endTime;
+  let data = {
+    filename: req.body.filename,
+    sourcePath: req.body.url,
+    startTime: req.body.startTime,
+    endTime: req.body.endTime,
+    // duration: endTime - startTime,
+    userId: req.body.userId,
+  };
+  const response = await videoService.trim(data);
+  return res.status(200).json(response);
+};

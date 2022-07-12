@@ -1,0 +1,70 @@
+******Code For Dyanamic Individual Path From Single Folder******
+
+const rootFolder = Path.join(__dirname, "../../public/videos/UploadedVideos/");
+
+await readdir(rootFolder);
+
+async function readdir(filePath) {
+  const rootFolder = Path.join(__dirname, "../../public/videos/UploadedVideos/");
+  fs.readdir(filePath, (err, files) => {
+    files.forEach((file) => {
+      let filePath = Path.join(rootFolder, file);
+      videoNames.push(`${filePath}`);
+    });
+    return videoNames;
+  });
+}
+
+
+******Code For Delete Files From Single Folder******
+
+const directory = "public/videos/UploadedVideos";
+fs.readdir(directory, (err, files) => {
+  if (err) reject(err);
+
+  for (const file of files) {
+    fs.unlink(Path.join(directory, file), (err) => {
+      if (err) throw err;
+    });
+  }
+
+
+******Code For Side Video******
+
+var ffmpeg = require("fluent-ffmpeg");
+const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+const Path = require("path");
+
+ffmpeg.setFfmpegPath(
+    Path.join(__dirname, "packages/ffmpeg/bin/ffmpeg.exe")
+  );
+  ffmpeg.setFfprobePath(
+    Path.join(__dirname, "packages/ffmpeg/bin/ffprobe.exe")
+  );
+
+var mergedVideo = ffmpeg();
+var videoNames = ["./video1.mp4", "./video2.mp4"];
+
+videoNames.forEach(function (videoName) {
+  mergedVideo = mergedVideo.addInput(videoName);
+});
+
+mergedVideo
+.input('video1.mp4')
+.input('video2.mp4')
+.videoCodec('libx264')
+.complexFilter([
+  '[0:v]scale=400:300[0scaled]',
+  '[1:v]scale=400:300[1scaled]',
+  '[0scaled]pad=800:300[0padded]',
+  '[0padded][1scaled]overlay=shortest=1:x=400[output]',
+])
+.outputOptions(['-map [output]'])
+.output('output.mp4')
+.on('error', function (er) {
+  console.log('error occured: ' + er.message);
+})
+.on('end', function () {
+  console.log('success');
+})
+.run();

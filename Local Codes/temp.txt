@@ -1,0 +1,411 @@
+const ffmpeg = require("fluent-ffmpeg");
+const pathToFfmpeg = require("ffmpeg-static");
+const ffprobe = require("ffprobe-static");
+const Path = require("path");
+const fs = require("fs");
+const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+const videoModel = require("../models/video");
+
+ffmpeg.setFfmpegPath(
+  Path.join(__dirname, "../../packages/ffmpeg/bin/ffmpeg.exe")
+);
+ffmpeg.setFfprobePath(
+  Path.join(__dirname, "../../packages/ffmpeg/bin/ffprobe.exe")
+);
+
+var videoNames = [];
+
+const create = async () => {};
+
+const getVideoByUser = async (getVideoById) => {
+  return await new Promise(async (resolve, reject) => {
+    await videoModel
+      .findAll({
+        where: {
+          userId: getVideoById.getVideoByUserId,
+          groupId: getVideoById.getVideoByGroupId,
+        },
+      })
+      .then((data) => {
+        resolve(data);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
+};
+
+const trim = async (data) => {
+  return await new Promise(async (resolve, reject) => {
+    var group = await videoModel.findOne({
+      order: [["groupId", "DESC"]],
+      attributes: ["groupId"],
+    });
+    let grpId = group != null ? parseInt(group.groupId) + 1 : 1;
+    let filename = data.filename + `_group_${grpId}.mp4`;
+    let sourcePath = data.SourcePath;
+    let startTime = data.StartTime;
+    let endTime = data.EndTime;
+    let duration = endTime - startTime;
+    let outputPath = `public/videos/TrimVideos/${filename}`;
+
+    ffmpeg(sourcePath)
+      .setFfmpegPath(pathToFfmpeg)
+      .setFfprobePath(ffprobe.path)
+      .output(outputPath)
+      .setStartTime(startTime)
+      .setDuration(duration)
+      .withVideoCodec("copy")
+      .withAudioCodec("copy")
+      .on("progress", function (progress) {
+        console.log("Progress :- ", +Math.floor(progress.percent));
+      })
+      .on("end", async function (err) {
+        if (!err) {
+          console.log("conversion Done");
+          // const directory = "public/videos/UploadedVideos";
+          // fs.readdir(directory, (err, files) => {
+          //   if (err) reject(err);
+
+          //   for (const file of files) {
+          //     fs.unlink(Path.join(directory, file), (err) => {
+          //       if (err) throw err;
+          //     });
+          //   }
+          // });
+        } else {
+          console.log("conversion not done");
+        }
+        var videoObj = {
+          userId: 2,
+          groupId: grpId,
+          filename: `${filename}`,
+          url: `${outputPath}`,
+          formate: "video/mp4",
+          editType: "trim",
+          length: `${duration}`,
+        };
+        let video = await videoModel.create(videoObj);
+        if (video) {
+          let rootPath = Path.join(__dirname, "../../");
+          video.url = Path.join(rootPath, video.url);
+        }
+        resolve(video);
+      })
+      .on("error", function (err) {
+        console.log("error: ", err);
+        reject(err);
+      })
+      .run();
+  });
+};
+
+const merge = async (videoFiles) => {
+  return await new Promise(async (resolve, reject) => {
+    let urls = videoFiles.urls;
+    // const rootFolder = Path.join(
+    //   __dirname,
+    //   "../../public/videos/UploadedVideos/"
+    // );
+    let filename, mergedVideoFilepath;
+    // await readdir(rootFolder);
+
+    setTimeout(async function () {
+      var group = await videoModel.findOne({
+        order: [["groupId", "DESC"]],
+        attributes: ["groupId"],
+      });
+      let grpId = group != null ? parseInt(group.groupId) + 1 : 1;
+      let tempFilename = `${Date.now()}_group_${grpId}.mp4`;
+      filename = `public/videos/mergedVideos/${tempFilename}`;
+      mergedVideoFilepath = Path.join("mergedVideos", tempFilename);
+      var mergedVideo = ffmpeg();
+      urls.forEach(function (url) {
+        mergedVideo = mergedVideo.addInput(url);
+      });
+
+      mergedVideo
+        .setFfmpegPath(ffmpegInstaller.path)
+        .on("progress", function (progress) {
+          console.log("Merging :- " + Math.floor(progress.percent));
+        })
+        .on("error", function (err) {
+          console.log("An error occurred: " + err.message);
+          reject(err);
+        })
+        .on("end", async function () {
+          console.log("Merging finished !");
+          // const directory = "public/videos/UploadedVideos";
+          // fs.readdir(directory, (err, files) => {
+          //   if (err) reject(err);
+
+          //   for (const file of files) {
+          //     fs.unlink(Path.join(directory, file), (err) => {
+          //       if (err) throw err;
+          //     });
+          //   }
+          var videoObj = {
+            userId: 1,
+            groupId: grpId,
+            filename: `${mergedVideoFilepath}`,
+            url: `${filename}`,
+            formate: "video/mp4",
+            editType: "merge",
+          };
+          let video = await videoModel.create(videoObj);
+          if (video) {
+            let rootPath = Path.join(__dirname, "../../");
+            video.url = Path.join(rootPath, video.url);
+          }
+          resolve(video);
+          // });
+        })
+        .mergeToFile(`${filename}`);
+    }, 500);
+  });
+};
+
+const annotation = async (objData) => {
+  return await new Promise(async (resolve, reject) => {
+    var group = await videoModel.findOne({
+      order: [["groupId", "DESC"]],
+      attributes: ["groupId"],
+    });
+    let grpId = group != null ? parseInt(group.groupId) + 1 : 1;
+
+    let filename = objData.video.filename + `_group_${grpId}.mp4`;
+    let sourcePath = objData.video.sourcePath;
+    let outputPath = `public/videos/annotationVideos/${filename}`;
+
+    let addImagePath_1 = objData.annotation[0].imageUrl;
+    let scale_x_1 = objData.annotation[0].scale_X;
+    let scale_y_1 = objData.annotation[0].scale_Y;
+    let startTime_1 = objData.annotation[0].startTime;
+    let endTime_1 = objData.annotation[0].endTime;
+
+    let addImagePath_2 = objData.annotation[1].imageUrl;
+    let scale_x_2 = objData.annotation[1].scale_X;
+    let scale_y_2 = objData.annotation[1].scale_Y;
+    let startTime_2 = objData.annotation[1].startTime;
+    let endTime_2 = objData.annotation[1].endTime;
+
+    ffmpeg.ffprobe(sourcePath, (err, metaData) => {
+      ffmpeg()
+        .input(sourcePath)
+        .input(addImagePath_1)
+        .input(addImagePath_2)
+        .complexFilter(
+          [
+            {
+              filter: "overlay",
+              options: {
+                enable: `between(t,${startTime_1},${endTime_1})`,
+                x: `${scale_x_1}`,
+                y: `${scale_y_1}`,
+              },
+              inputs: "[0:v][1:v]",
+              outputs: "tmp",
+            },
+            {
+              filter: "overlay",
+              options: {
+                enable: `between(t,${startTime_2},${endTime_2})`,
+                x: `${scale_x_2}`,
+                y: `${scale_y_2}`,
+              },
+              inputs: "[tmp][2:v]",
+              outputs: "tmp",
+            },
+          ],
+          "tmp"
+        )
+        .videoCodec("libx264")
+        // .outputOptions("-pix_fmt yuv420p")
+        .output(outputPath)
+        .on("progress", function (progres) {
+          console.log("... frames :- " + progres.frames);
+        })
+        .on("end", async function (err) {
+          if (!err) {
+            console.log("conversion Done");
+            let videoObj = {
+              userId: 1,
+              groupId: grpId,
+              filename: filename,
+              url: outputPath,
+              // formate: formate,
+              editType: "video annotation",
+              annotation: "Success",
+            };
+            const video = await videoModel.create(videoObj);
+            if (video) {
+              let rootPath = Path.join(__dirname, "../../");
+              video.url = Path.join(rootPath, video.url);
+            }
+            resolve(video);
+            // const directory = "public/images/UploadedImages";
+            // fs.readdir(directory, (err, files) => {
+            //   if (err) reject(err);
+
+            //   for (const file of files) {
+            //     fs.unlink(path.join(directory, file), (err) => {
+            //       if (err) throw err;
+            //     });
+            //   }
+            //   resolve();
+            // });
+          } else {
+            console.log("conversion not done");
+            reject();
+          }
+          resolve();
+        })
+        .on("error", (err) => console.error(err))
+        .run();
+    });
+  });
+};
+
+const mergeByGroupId = async (id) => {
+  return await new Promise(async (resolve, reject) => {
+    let videoData = await videoModel.findAll({
+      where: { groupId: id },
+      attributes: ["url"],
+    });
+    let urls = [];
+    for (let i = 0; i < videoData.length; i++) {
+      urls[i] = videoData[i].url;
+    }
+    console.log(urls);
+
+    for (var i = 0; i < urls.length; i++) {
+      let tempFilename1 = `${Date.now()}_pixel.mp4`;
+      let outputPth = `public/videos/pixelVideos/${tempFilename1}`;
+      ffmpeg(urls[i])
+        .setFfmpegPath(ffmpegInstaller.path)
+        .output(outputPth)
+        .videoCodec("libx264")
+        // .noAudio()
+        .size("300x300")
+
+        .on("error", function (err) {
+          console.log("An error occured :- " + err);
+        })
+        .on("progress", function (progres) {
+          console.log("... frames :- " + progres.frames);
+        })
+        .on("end", function () {
+          console.log("Finished processing");
+        })
+        .run();
+    }
+
+    const rootFolder = Path.join(
+      __dirname,
+      "../../public/videos/pixelVideos/"
+    );
+    await readdir(rootFolder);
+
+    setTimeout(async function () {
+      var group = await videoModel.findOne({
+        order: [["groupId", "DESC"]],
+        attributes: ["groupId"],
+      });
+      let grpId = group != null ? parseInt(group.groupId) + 1 : 1;
+      let tempFilename = `${Date.now()}_group_${grpId}.mp4`;
+      let filename = `public/videos/mergedVideos/${tempFilename}`;
+      let mergedVideoFilepath = Path.join("mergedVideos", tempFilename);
+      var mergedVideo = ffmpeg();
+      videoNames.forEach(function (url) {
+        mergedVideo = mergedVideo.addInput(url);
+      });
+      console.log(videoNames, "111111111111")
+      mergedVideo
+        .setFfmpegPath(ffmpegInstaller.path)
+
+        .on("progress", function (progress) {
+          console.log("Merging :- " + Math.floor(progress.percent));
+        })
+        .on("error", function (err) {
+          console.log("An error occurred: " + err.message);
+          reject(err);
+        })
+        .on("end", async function () {
+          console.log("Merging finished !");
+          var videoObj = {
+            userId: 1,
+            groupId: grpId,
+            filename: `${mergedVideoFilepath}`,
+            url: `${filename}`,
+            formate: "video/mp4",
+            editType: "merge",
+            length: "",
+          };
+          let video = await videoModel.create(videoObj);
+          if (video) {
+            let rootPath = Path.join(__dirname, "../../");
+            video.url = Path.join(rootPath, video.url);
+          }
+          resolve(video);
+        })
+        .mergeToFile(`${filename}`);
+    }, 500);
+  });
+};
+
+const addSubtitle = async (bodyData) => {
+  return await new Promise(async (resolve, reject) => {
+    var group = await videoModel.findOne({
+      order: [["groupId", "DESC"]],
+      attributes: ["groupId"],
+    });
+    let grpId = group != null ? parseInt(group.groupId) + 1 : 1;
+
+    let filename = bodyData.fileName + `_group_${grpId}.mp4`;
+    let sourcePath = bodyData.sourcePath;
+    let srtPath = bodyData.srtFile;
+    let savePath = `public/videos/subtitlesVideo/${filename}`;
+
+    ffmpeg.ffprobe(sourcePath, (err, metaData) => {
+      console.log("inside addSubtitles");
+      ffmpeg(sourcePath)
+        .videoCodec("libx264")
+        .audioCodec("libmp3lame")
+        .outputOptions(`-vf subtitles=${srtPath}`)
+        .on("progress", function (progres) {
+          console.log("... frames :- " + progres.frames);
+        })
+        .on("error", function (err) {
+          console.log(err);
+        })
+        .save(savePath)
+        .on("end", function () {
+          console.log("Done!");
+        });
+    });
+  });
+};
+
+async function readdir(filePath) {
+  const rootFolder = Path.join(
+    __dirname,
+    "../../public/videos/pixelVideos/"
+  );
+  fs.readdir(filePath, (err, files) => {
+    files.forEach((file) => {
+      let filePath = Path.join(rootFolder, file);
+      videoNames.push(`${filePath}`);
+    });
+    return videoNames;
+  });
+}
+
+module.exports = {
+  create,
+  trim,
+  merge,
+  getVideoByUser,
+  annotation,
+  mergeByGroupId,
+  addSubtitle,
+};
